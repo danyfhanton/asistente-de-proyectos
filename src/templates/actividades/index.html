@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Historial & Exportar - {{ proyecto_actual.nombre if proyecto_actual else 'Asistente de Proyectos' }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="fw-bold mb-1">Historial de Actividades & Exportación</h3>
+      <p class="text-muted small mb-0">Auditoría de comentarios, cambios recientes y descarga de reportes.</p>
+    </div>
+    {% if proyecto_actual %}
+    <div class="d-flex gap-2">
+      <a href="/exportar/csv?proyecto_id={{ proyecto_actual.id }}" class="btn btn-outline-success fw-semibold">
+        <i class="fa fa-file-excel me-1"></i> Exportar a CSV
+      </a>
+      <a href="/exportar/json?proyecto_id={{ proyecto_actual.id }}" class="btn btn-outline-primary fw-semibold">
+        <i class="fa fa-file-code me-1"></i> Respaldo JSON
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="row g-4">
+    <!-- Comentarios y Feed de Actualizaciones -->
+    <div class="col-md-7">
+      <div class="card border-0 shadow-sm rounded-3">
+        <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+          <i class="fa fa-comments text-primary"></i>
+          <h6 class="fw-bold mb-0">Feed de Actualizaciones & Comentarios</h6>
+        </div>
+        <div class="card-body p-3">
+          {% if comentarios %}
+            <div class="timeline">
+              {% for c in comentarios %}
+              <div class="border-bottom pb-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="avatar-circle" style="width: 24px; height: 24px; font-size: 0.7rem;">
+                      {{ c.autor[:1] | upper }}
+                    </span>
+                    <span class="fw-bold small text-dark">{{ c.autor }}</span>
+                    <span class="text-muted small">en</span>
+                    <a href="javascript:void(0)" class="fw-semibold small text-primary text-decoration-none" onclick="verDetalleTarea({{ c.tarea.id }})">
+                      {{ c.tarea.titulo }}
+                    </a>
+                  </div>
+                  <span class="text-muted" style="font-size: 0.75rem;">
+                    {{ c.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}
+                  </span>
+                </div>
+                <div class="p-2 bg-light rounded text-dark small ms-4">
+                  {{ c.contenido }}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-center py-4 text-muted">
+              <i class="fa fa-comment-slash fa-2x mb-2 text-muted"></i>
+              <div>No hay comentarios registrados todavía.</div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Actividades Modificadas Recientemente -->
+    <div class="col-md-5">
+      <div class="card border-0 shadow-sm rounded-3">
+        <div class="card-header bg-white py-3 border-bottom d-flex align-items-center gap-2">
+          <i class="fa fa-clock-rotate-left text-primary"></i>
+          <h6 class="fw-bold mb-0">Actividades Recientes</h6>
+        </div>
+        <div class="card-body p-0">
+          <div class="list-group list-group-flush">
+            {% for t in tareas_recientes %}
+            <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+              <div>
+                <a href="javascript:void(0)" class="fw-semibold text-dark text-decoration-none small d-block" onclick="verDetalleTarea({{ t.id }})">
+                  {{ t.titulo }}
+                </a>
+                <span class="text-muted" style="font-size: 0.75rem;">
+                  Responsable: {{ t.responsable }} · {{ t.fecha_actualizacion.strftime('%d/%m %H:%M') }}
+                </span>
+              </div>
+              <span class="status-badge status-{{ t.estado | replace(' ', '-') }}" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;">
+                {{ t.estado }}
+              </span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+

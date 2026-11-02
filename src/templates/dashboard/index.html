@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard & Métricas - {{ proyecto_actual.nombre if proyecto_actual else 'Asistente de Proyectos' }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="fw-bold mb-1">Métricas & Salud del Proyecto</h3>
+      <p class="text-muted small mb-0">Visión analítica del rendimiento del equipo, progreso de actividades y distribución de carga.</p>
+    </div>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm p-3 bg-white rounded-3">
+        <div class="text-muted small fw-semibold">Avance Global</div>
+        <div class="d-flex align-items-baseline gap-2 mt-1">
+          <div class="h2 fw-bold mb-0 text-primary">{{ stats.porcentaje_avance }}%</div>
+          <span class="text-muted small">completado</span>
+        </div>
+        <div class="progress mt-2" style="height: 6px;">
+          <div class="progress-bar bg-success" style="width: {{ stats.porcentaje_avance }}%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm p-3 bg-white rounded-3">
+        <div class="text-muted small fw-semibold">Puntos de Historia</div>
+        <div class="d-flex align-items-baseline gap-2 mt-1">
+          <div class="h2 fw-bold mb-0 text-success">{{ stats.puntos_completados }}</div>
+          <span class="text-muted small">/ {{ stats.puntos_totales }} pts</span>
+        </div>
+        <div class="text-muted small mt-1">Velocidad del equipo</div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm p-3 bg-white rounded-3">
+        <div class="text-muted small fw-semibold">Actividades Totales</div>
+        <div class="h2 fw-bold mb-0 mt-1 text-dark">{{ stats.total }}</div>
+        <div class="text-muted small mt-1">{{ stats.en_curso }} en progreso actual</div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm p-3 bg-white rounded-3">
+        <div class="text-muted small fw-semibold">Bloqueos Detectados</div>
+        <div class="h2 fw-bold mb-0 mt-1 text-danger">{{ stats.bloqueadas }}</div>
+        <div class="text-muted small mt-1">Requieren atención inmediata</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GRÁFICOS -->
+  <div class="row g-4">
+    <!-- Distribución de Estados -->
+    <div class="col-md-5">
+      <div class="card border-0 shadow-sm p-4 bg-white rounded-3 h-100">
+        <h6 class="fw-bold text-dark mb-3">Distribución por Estado (Monday Style)</h6>
+        <div style="height: 260px; position: relative;">
+          <canvas id="chartEstados"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Carga por Responsable -->
+    <div class="col-md-7">
+      <div class="card border-0 shadow-sm p-4 bg-white rounded-3 h-100">
+        <h6 class="fw-bold text-dark mb-3">Carga de Trabajo & Puntos por Integrante</h6>
+        <div style="height: 260px; position: relative;">
+          <canvas id="chartResponsables"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Gráfico de Estados
+  const ctxEstados = document.getElementById('chartEstados').getContext('2d');
+  new Chart(ctxEstados, {
+    type: 'doughnut',
+    data: {
+      labels: ['Listo', 'En curso', 'En espera', 'Bloqueado', 'Por iniciar'],
+      datasets: [{
+        data: [
+          {{ stats.completadas }},
+          {{ stats.en_curso }},
+          {{ stats.en_espera }},
+          {{ stats.bloqueadas }},
+          {{ stats.por_iniciar }}
+        ],
+        backgroundColor: ['#00C875', '#FDAB3D', '#579BFC', '#E2445C', '#C4C4C4'],
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom' }
+      }
+    }
+  });
+
+  // Gráfico de Responsables
+  const respLabels = [{% for r in stats.responsables.keys() %}'{{ r }}',{% endfor %}];
+  const respPuntos = [{% for r, v in stats.responsables.items() %}{{ v.puntos }},{% endfor %}];
+  const respCompletadas = [{% for r, v in stats.responsables.items() %}{{ v.completadas }},{% endfor %}];
+
+  const ctxResp = document.getElementById('chartResponsables').getContext('2d');
+  new Chart(ctxResp, {
+    type: 'bar',
+    data: {
+      labels: respLabels,
+      datasets: [
+        {
+          label: 'Puntos Asignados',
+          data: respPuntos,
+          backgroundColor: '#6161FF',
+          borderRadius: 4,
+        },
+        {
+          label: 'Completadas',
+          data: respCompletadas,
+          backgroundColor: '#00C875',
+          borderRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { beginAtZero: true }
+      },
+      plugins: {
+        legend: { position: 'bottom' }
+      }
+    }
+  });
+});
+</script>
+{% endblock %}
+

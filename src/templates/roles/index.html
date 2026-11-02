@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Administración de Roles - {{ proyecto_actual.nombre if proyecto_actual else 'Asistente de Proyectos' }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="fw-bold mb-1">Roles & Permisos del Sistema</h3>
+      <p class="text-muted small mb-0">Configura los niveles de acceso, alcance de proyectos (todos o uno) y responsabilidades en SQL Server.</p>
+    </div>
+    <button class="btn btn-primary fw-semibold" onclick="abrirModalCrearRol()">
+      <i class="fa fa-plus me-1"></i> Nuevo Rol
+    </button>
+  </div>
+
+  <!-- GRID DE ROLES -->
+  <div class="row g-4">
+    {% for r in roles %}
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm rounded-3 h-100 position-relative overflow-hidden" style="border-top: 5px solid {{ r.color }} !important;">
+        <div class="card-body p-4 d-flex flex-direction-column flex-column justify-content-between">
+          <div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h5 class="fw-bold mb-0 text-dark">{{ r.nombre }}</h5>
+              <span class="badge rounded-pill bg-light text-dark border">
+                <i class="fa fa-users text-primary me-1"></i> {{ r.total_usuarios }} usuarios
+              </span>
+            </div>
+            <p class="text-muted small mb-3" style="min-height: 40px;">{{ r.descripcion }}</p>
+
+            <!-- Alcance de Proyectos -->
+            <div class="mb-3">
+              <label class="form-label text-muted small fw-bold" style="font-size: 0.72rem; text-transform: uppercase;">Alcance de Proyectos</label>
+              <div>
+                {% if r.alcance_proyectos == 'uno' %}
+                  <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
+                    <i class="fa fa-lock me-1"></i> Solo 1 Proyecto asignado
+                  </span>
+                {% else %}
+                  <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle px-2 py-1">
+                    <i class="fa fa-globe me-1"></i> Todos los proyectos (Global)
+                  </span>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label text-muted small fw-bold" style="font-size: 0.72rem; text-transform: uppercase;">Permisos Asignados</label>
+              <div class="d-flex flex-wrap gap-1">
+                {% if r.permisos %}
+                  {% for p in r.permisos %}
+                  <span class="badge bg-light text-secondary border small">{{ p }}</span>
+                  {% endfor %}
+                {% else %}
+                  <span class="text-muted small">Sin permisos asignados</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-top d-flex justify-content-between align-items-center mt-3">
+            <span class="text-muted" style="font-size: 0.75rem;">
+              Creado: {{ r.fecha_creacion.strftime('%d/%m/%Y') }}
+            </span>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-secondary" onclick="editarRolModal({{ r.id }}, '{{ r.nombre }}', '{{ r.descripcion }}', '{{ r.color }}', '{{ r.alcance_proyectos }}')" title="Editar Rol">
+                <i class="fa fa-edit"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger" onclick="eliminarRolModal({{ r.id }})" title="Eliminar Rol">
+                <i class="fa fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function abrirModalCrearRol() {
+  const { value: formValues } = await Swal.fire({
+    title: 'Crear Nuevo Rol',
+    html:
+      '<div class="text-start">' +
+      '<label class="form-label small fw-bold mb-1">Nombre del Rol</label>' +
+      '<input id="swal-rol-nombre" class="form-control mb-3" placeholder="Ej. Tester QA">' +
+      '<label class="form-label small fw-bold mb-1">Descripción</label>' +
+      '<textarea id="swal-rol-desc" class="form-control mb-3" placeholder="Propósito del rol..."></textarea>' +
+      '<label class="form-label small fw-bold mb-1">Alcance de Proyectos</label>' +
+      '<select id="swal-rol-alcance" class="form-select mb-3">' +
+      '  <option value="todos">Todos los proyectos (Acceso Global)</option>' +
+      '  <option value="uno">Solo un proyecto (Restringido al proyecto asignado)</option>' +
+      '</select>' +
+      '<label class="form-label small fw-bold mb-1">Color Identificador</label>' +
+      '<input id="swal-rol-color" type="color" class="form-control form-control-color mb-3" value="#6161FF">' +
+      '</div>',
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Guardar Rol',
+    confirmButtonColor: '#6161FF',
+    preConfirm: () => {
+      const nombre = document.getElementById('swal-rol-nombre').value.trim();
+      if (!nombre) {
+        Swal.showValidationMessage('El nombre del rol es obligatorio');
+        return false;
+      }
+      return {
+        nombre: nombre,
+        descripcion: document.getElementById('swal-rol-desc').value.trim(),
+        color: document.getElementById('swal-rol-color').value,
+        alcance_proyectos: document.getElementById('swal-rol-alcance').value,
+        permisos: ['tareas', 'tablero', 'comentarios']
+      };
+    }
+  });
+
+  if (formValues) {
+    const res = await fetch('/api/roles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formValues)
+    });
+    if (res.ok) {
+      Toast.fire({ icon: 'success', title: 'Rol creado exitosamente' });
+      setTimeout(() => location.reload(), 400);
+    }
+  }
+}
+
+async function editarRolModal(rolId, nombre, desc, color, alcanceActual) {
+  const isUno = alcanceActual === 'uno';
+  const { value: formValues } = await Swal.fire({
+    title: 'Editar Rol',
+    html:
+      '<div class="text-start">' +
+      '<label class="form-label small fw-bold mb-1">Nombre del Rol</label>' +
+      `<input id="swal-edit-rol-nombre" class="form-control mb-3" value="${nombre}">` +
+      '<label class="form-label small fw-bold mb-1">Descripción</label>' +
+      `<textarea id="swal-edit-rol-desc" class="form-control mb-3">${desc}</textarea>` +
+      '<label class="form-label small fw-bold mb-1">Alcance de Proyectos</label>' +
+      '<select id="swal-edit-rol-alcance" class="form-select mb-3">' +
+      `  <option value="todos" ${!isUno ? 'selected' : ''}>Todos los proyectos (Acceso Global)</option>` +
+      `  <option value="uno" ${isUno ? 'selected' : ''}>Solo un proyecto (Restringido al proyecto asignado)</option>` +
+      '</select>' +
+      '<label class="form-label small fw-bold mb-1">Color Identificador</label>' +
+      `<input id="swal-edit-rol-color" type="color" class="form-control form-control-color mb-3" value="${color}">` +
+      '</div>',
+    showCancelButton: true,
+    confirmButtonText: 'Actualizar',
+    confirmButtonColor: '#6161FF',
+    preConfirm: () => {
+      return {
+        nombre: document.getElementById('swal-edit-rol-nombre').value.trim(),
+        descripcion: document.getElementById('swal-edit-rol-desc').value.trim(),
+        color: document.getElementById('swal-edit-rol-color').value,
+        alcance_proyectos: document.getElementById('swal-edit-rol-alcance').value,
+      };
+    }
+  });
+
+  if (formValues) {
+    const res = await fetch(`/api/roles/${rolId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formValues)
+    });
+    if (res.ok) {
+      Toast.fire({ icon: 'success', title: 'Rol actualizado' });
+      setTimeout(() => location.reload(), 400);
+    }
+  }
+}
+
+async function eliminarRolModal(rolId) {
+  const result = await Swal.fire({
+    title: '¿Eliminar este rol?',
+    text: 'Esta acción desvinculará a los usuarios que tengan este rol asignado.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#e2445c',
+    confirmButtonText: 'Sí, eliminar',
+    cancelButtonText: 'Cancelar'
+  });
+
+  if (result.isConfirmed) {
+    const res = await fetch(`/api/roles/${rolId}`, { method: 'DELETE' });
+    if (res.ok) {
+      Toast.fire({ icon: 'success', title: 'Rol eliminado' });
+      setTimeout(() => location.reload(), 400);
+    }
+  }
+}
+</script>
+{% endblock %}

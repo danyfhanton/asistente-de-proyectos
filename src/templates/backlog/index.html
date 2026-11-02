@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Backlog & Sprints - {{ proyecto_actual.nombre if proyecto_actual else 'Asistente de Proyectos' }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-4">
+
+  <!-- ACCIONES DE BACKLOG & BOTÓN CREAR SPRINT -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="fw-bold mb-1">Backlog del Producto</h3>
+      <p class="text-muted small mb-0">Planifica iteraciones, asigna puntos de historia y gestiona el flujo de trabajo hacia los sprints.</p>
+    </div>
+    {% if proyecto_actual %}
+    <button class="btn btn-primary fw-semibold" onclick="crearSprintModal({{ proyecto_actual.id }})">
+      <i class="fa fa-plus me-1"></i> Crear Sprint
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- SECCIÓN SPRINT ACTIVO -->
+  {% if sprint_activo %}
+  <div class="card border-0 shadow-sm mb-4 rounded-3">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+      <div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-success">Sprint Activo</span>
+          <h5 class="fw-bold mb-0">{{ sprint_activo.nombre }}</h5>
+          <span class="badge bg-light text-dark border">{{ total_puntos_activo }} pts de historia</span>
+        </div>
+        {% if sprint_activo.objetivo %}
+        <p class="text-muted small mb-0 mt-1"><i class="fa fa-bullseye text-primary me-1"></i> {{ sprint_activo.objetivo }}</p>
+        {% endif %}
+      </div>
+      <div>
+        <button class="btn btn-sm btn-outline-success fw-semibold" onclick="cambiarEstadoSprint({{ sprint_activo.id }}, 'Completado')">
+          <i class="fa fa-check-double me-1"></i> Completar Sprint
+        </button>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="list-group list-group-flush">
+        {% for t in sprint_activo.tareas %}
+        <div class="list-group-item d-flex align-items-center justify-content-between py-2 px-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="badge bg-light text-secondary border">{{ t.tipo_tarea }}</span>
+            <a href="javascript:void(0)" class="fw-semibold text-dark text-decoration-none" onclick="verDetalleTarea({{ t.id }})">
+              {{ t.titulo }}
+            </a>
+          </div>
+          <div class="d-flex align-items-center gap-3">
+            <span class="prio-badge prio-{{ t.prioridad | replace('í', 'i') }}">{{ t.prioridad }}</span>
+            <span class="status-badge status-{{ t.estado | replace(' ', '-') }}" style="min-width: 110px; cursor: pointer;" onclick="abrirSelectorEstado(event, {{ t.id }})">
+              {{ t.estado }}
+            </span>
+            <span class="badge bg-light text-dark border">{{ t.puntos_historia }} pts</span>
+            <button class="btn btn-sm btn-link text-muted p-0" onclick="moverASprint({{ t.id }}, null)" title="Mover a Backlog General">
+              <i class="fa fa-arrow-down"></i>
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- OTROS SPRINTS (PLANIFICADOS / COMPLETADOS) -->
+  {% for s in sprints %}
+    {% if s != sprint_activo %}
+    <div class="card border-0 shadow-sm mb-3 rounded-3">
+      <div class="card-header bg-white py-2 border-bottom d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge {% if s.estado == 'Completado' %}bg-secondary{% else %}bg-primary{% endif %}">{{ s.estado }}</span>
+          <span class="fw-bold">{{ s.nombre }}</span>
+          <span class="text-muted small">({{ s.tareas|length }} actividades)</span>
+        </div>
+        <div>
+          {% if s.estado == 'Planificado' and not sprint_activo %}
+          <button class="btn btn-sm btn-primary py-1" onclick="cambiarEstadoSprint({{ s.id }}, 'Activo')">
+            <i class="fa fa-play me-1"></i> Iniciar Sprint
+          </button>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="list-group list-group-flush">
+          {% for t in s.tareas %}
+          <div class="list-group-item d-flex align-items-center justify-content-between py-2 px-3">
+            <div class="d-flex align-items-center gap-2">
+              <a href="javascript:void(0)" class="fw-semibold text-dark text-decoration-none" onclick="verDetalleTarea({{ t.id }})">
+                {{ t.titulo }}
+              </a>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="status-badge status-{{ t.estado | replace(' ', '-') }}" style="min-width: 100px;">{{ t.estado }}</span>
+              <span class="badge bg-light text-dark border">{{ t.puntos_historia }} pts</span>
+              <button class="btn btn-sm btn-link text-muted p-0" onclick="moverASprint({{ t.id }}, null)" title="Mover a Backlog">
+                <i class="fa fa-arrow-down"></i>
+              </button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  {% endfor %}
+
+  <!-- BACKLOG GENERAL -->
+  <div class="card border-0 shadow-sm mt-4 rounded-3">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-2">
+        <div class="brand-logo-icon" style="width: 24px; height: 24px; font-size: 0.75rem;">B</div>
+        <h5 class="fw-bold mb-0">Backlog General (Sin Sprint asignado)</h5>
+        <span class="badge bg-light text-dark border">{{ total_puntos_backlog }} pts totales</span>
+      </div>
+    </div>
+
+    <div class="card-body p-0">
+      {% if tareas_sin_sprint %}
+      <div class="list-group list-group-flush">
+        {% for t in tareas_sin_sprint %}
+        <div class="list-group-item d-flex align-items-center justify-content-between py-2 px-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="badge bg-light text-secondary border">{{ t.tipo_tarea }}</span>
+            <a href="javascript:void(0)" class="fw-semibold text-dark text-decoration-none" onclick="verDetalleTarea({{ t.id }})">
+              {{ t.titulo }}
+            </a>
+          </div>
+          <div class="d-flex align-items-center gap-3">
+            <span class="prio-badge prio-{{ t.prioridad | replace('í', 'i') }}">{{ t.prioridad }}</span>
+            <span class="status-badge status-{{ t.estado | replace(' ', '-') }}" style="min-width: 110px;" onclick="abrirSelectorEstado(event, {{ t.id }})">
+              {{ t.estado }}
+            </span>
+            <span class="badge bg-light text-dark border">{{ t.puntos_historia }} pts</span>
+
+            <!-- Mover a Sprint Dropdown -->
+            <div class="dropdown">
+              <button class="btn btn-sm btn-outline-secondary dropdown-toggle py-0" type="button" data-bs-toggle="dropdown">
+                Asignar Sprint
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end shadow">
+                {% for s in sprints %}
+                <li>
+                  <a class="dropdown-item small" href="javascript:void(0)" onclick="moverASprint({{ t.id }}, {{ s.id }})">
+                    <i class="fa fa-arrow-up text-primary me-1"></i> {{ s.nombre }} ({{ s.estado }})
+                  </a>
+                </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">
+        <i class="fa fa-check-circle fa-2x mb-2 text-success"></i>
+        <div>No hay elementos en el backlog general. ¡Todas las tareas están organizadas en sprints!</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function crearSprintModal(proyectoId) {
+  const { value: formValues } = await Swal.fire({
+    title: 'Crear Nuevo Sprint',
+    html:
+      '<input id="swal-sprint-nombre" class="swal2-input" placeholder="Nombre del Sprint (ej. Sprint 2)">' +
+      '<input id="swal-sprint-obj" class="swal2-input" placeholder="Objetivo del Sprint">',
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Crear Sprint',
+    confirmButtonColor: '#6161FF',
+    preConfirm: () => {
+      return {
+        proyecto_id: proyectoId,
+        nombre: document.getElementById('swal-sprint-nombre').value,
+        objetivo: document.getElementById('swal-sprint-obj').value,
+      };
+    },
+  });
+
+  if (formValues && formValues.nombre) {
+    const res = await fetch('/api/sprints', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formValues),
+    });
+    if (res.ok) {
+      Toast.fire({ icon: 'success', title: 'Sprint creado' });
+      setTimeout(() => location.reload(), 400);
+    }
+  }
+}
+
+async function cambiarEstadoSprint(sprintId, nuevoEstado) {
+  const res = await fetch(`/api/sprints/${sprintId}/estado?estado=${nuevoEstado}`, {
+    method: 'PATCH',
+  });
+  if (res.ok) {
+    Toast.fire({ icon: 'success', title: `Sprint ${nuevoEstado}` });
+    setTimeout(() => location.reload(), 400);
+  }
+}
+
+async function moverASprint(tareaId, sprintId) {
+  const res = await fetch(`/api/tareas/${tareaId}/mover-sprint`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sprint_id: sprintId }),
+  });
+  if (res.ok) {
+    Toast.fire({ icon: 'success', title: 'Actividad movida' });
+    setTimeout(() => location.reload(), 350);
+  }
+}
+</script>
+{% endblock %}
+

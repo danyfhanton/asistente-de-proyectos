@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Asistente de Proyectos{% endblock %}</title>
+
+  <!-- Google Fonts & FontAwesome -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Bootstrap 5 & SweetAlert2 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Monday Style CSS -->
+  <link rel="stylesheet" href="/static/css/monday.css">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+  <!-- SIDEBAR NAVEGACIÓN -->
+  <aside class="app-sidebar">
+    <div class="sidebar-header">
+      <div class="brand-logo-icon">M</div>
+      <div>
+        <div class="fw-bold" style="font-size: 1rem; letter-spacing: -0.02em;">Asistente Proyectos</div>
+        <div style="font-size: 0.72rem; color: #9da1b6;">Gestión Ágil & Backlog</div>
+      </div>
+    </div>
+
+    <!-- Selector de Proyecto -->
+    {% set current_u = request.session.get('user') %}
+    <div class="px-3 pt-3">
+      <label class="form-label text-muted small fw-bold mb-1" style="font-size: 0.72rem; text-transform: uppercase;">Proyecto Activo</label>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-light w-100 text-start d-flex justify-content-between align-items-center" type="button" data-bs-toggle="dropdown" {% if current_u and current_u.rol_alcance == 'uno' %}disabled title="Acceso restringido a 1 proyecto asignado"{% endif %}>
+          <span class="text-truncate">
+            <i class="fa fa-folder-open text-warning me-1"></i>
+            {{ proyecto_actual.nombre if proyecto_actual else 'Seleccionar...' }}
+          </span>
+          {% if not (current_u and current_u.rol_alcance == 'uno') %}
+          <i class="fa fa-chevron-down small"></i>
+          {% else %}
+          <i class="fa fa-lock small text-warning" title="Restringido a 1 proyecto asignado"></i>
+          {% endif %}
+        </button>
+        {% if not (current_u and current_u.rol_alcance == 'uno') %}
+        <ul class="dropdown-menu dropdown-menu-dark w-100 shadow">
+          {% for p in proyectos %}
+          <li>
+            <a class="dropdown-item {% if proyecto_actual and p.id == proyecto_actual.id %}active{% endif %}" href="?proyecto_id={{ p.id }}">
+              <i class="fa fa-check text-success me-1 {% if not (proyecto_actual and p.id == proyecto_actual.id) %}invisible{% endif %}"></i>
+              {{ p.nombre }}
+            </a>
+          </li>
+          {% endfor %}
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <a class="dropdown-item text-primary fw-bold" href="javascript:void(0)" onclick="crearNuevoProyecto()">
+              <i class="fa fa-plus me-1"></i> Crear nuevo proyecto
+            </a>
+          </li>
+        </ul>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Menú de Vistas -->
+    <ul class="sidebar-menu mt-2">
+      <li class="sidebar-section-title">Vistas Principales</li>
+      <li>
+        <a href="/tablero{% if proyecto_actual %}?proyecto_id={{ proyecto_actual.id }}{% endif %}" class="sidebar-link {% if modulo == 'tablero' %}active{% endif %}">
+          <i class="fa fa-table-columns"></i>
+          <span>Tablero</span>
+        </a>
+      </li>
+      <li>
+        <a href="/tablero/kanban{% if proyecto_actual %}?proyecto_id={{ proyecto_actual.id }}{% endif %}" class="sidebar-link {% if modulo == 'kanban' %}active{% endif %}">
+          <i class="fa fa-border-all"></i>
+          <span>Tablero Kanban</span>
+        </a>
+      </li>
+      <li>
+        <a href="/backlog{% if proyecto_actual %}?proyecto_id={{ proyecto_actual.id }}{% endif %}" class="sidebar-link {% if modulo == 'backlog' %}active{% endif %}">
+          <i class="fa fa-layer-group"></i>
+          <span>Gestión de Backlog</span>
+        </a>
+      </li>
+
+      <li class="sidebar-section-title">Control & Reportes</li>
+      <li>
+        <a href="/dashboard{% if proyecto_actual %}?proyecto_id={{ proyecto_actual.id }}{% endif %}" class="sidebar-link {% if modulo == 'dashboard' %}active{% endif %}">
+          <i class="fa fa-chart-pie"></i>
+          <span>Dashboard & KPIs</span>
+        </a>
+      </li>
+      <li>
+        <a href="/actividades{% if proyecto_actual %}?proyecto_id={{ proyecto_actual.id }}{% endif %}" class="sidebar-link {% if modulo == 'actividades' %}active{% endif %}">
+          <i class="fa fa-clock-rotate-left"></i>
+          <span>Historial & Exportar</span>
+        </a>
+      </li>
+
+      <li class="sidebar-section-title">Administración</li>
+      <li>
+        <a href="/usuarios{% if proyecto_actual %}?proyecto_id={{ proyecto_actual.id }}{% endif %}" class="sidebar-link {% if modulo == 'usuarios' %}active{% endif %}">
+          <i class="fa fa-users"></i>
+          <span>Usuarios</span>
+        </a>
+      </li>
+      <li>
+        <a href="/roles{% if proyecto_actual %}?proyecto_id={{ proyecto_actual.id }}{% endif %}" class="sidebar-link {% if modulo == 'roles' %}active{% endif %}">
+          <i class="fa fa-shield-halved"></i>
+          <span>Roles & Permisos</span>
+        </a>
+      </li>
+    </ul>
+
+    <!-- Footer Sidebar: Status SQL Server Local -->
+    <div class="mt-auto p-3 border-top border-secondary border-opacity-25" style="background: rgba(0,0,0,0.15);">
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-success rounded-circle p-1" style="width: 8px; height: 8px;"></span>
+        <div style="font-size: 0.72rem; color: #a4a9c4;">
+          <div class="fw-bold text-white">SQL Server Local</div>
+          <div>localhost\SQLEXPRESS</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <main class="app-main">
+    <!-- BARRA SUPERIOR -->
+    <header class="app-topbar">
+      <div class="topbar-left">
+        <h4 class="mb-0 fw-bold d-flex align-items-center gap-2" style="font-size: 1.15rem;">
+          <span style="color: {{ proyecto_actual.color if proyecto_actual else '#6161FF' }};">●</span>
+          {{ proyecto_actual.nombre if proyecto_actual else 'Gestión de Proyectos' }}
+        </h4>
+        {% if proyecto_actual %}
+        <span class="badge bg-light text-secondary border">{{ proyecto_actual.clave }}</span>
+        {% endif %}
+      </div>
+
+      <div class="topbar-right">
+        <!-- Buscador instantáneo -->
+        <div class="input-group input-group-sm" style="width: 240px;">
+          <span class="input-group-text bg-white border-end-0"><i class="fa fa-search text-muted"></i></span>
+          <input type="text" class="form-control border-start-0" placeholder="Buscar actividades..." oninput="filtrarTablero(this.value)">
+        </div>
+
+        {% if proyecto_actual %}
+        <button class="btn btn-sm btn-outline-primary fw-semibold" onclick="crearNuevoGrupo({{ proyecto_actual.id }})">
+          <i class="fa fa-folder-plus me-1"></i> Nuevo Grupo
+        </button>
+        {% endif %}
+
+        {% if not (current_u and current_u.rol_alcance == 'uno') %}
+        <button class="btn btn-sm btn-primary fw-semibold" onclick="crearNuevoProyecto()">
+          <i class="fa fa-plus me-1"></i> Nuevo Proyecto
+        </button>
+        {% endif %}
+
+        <!-- Perfil Usuario & Cerrar Sesión -->
+        {% set u = request.session.get('user') %}
+        <div class="dropdown ms-2">
+          <button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2 py-1 px-2" type="button" data-bs-toggle="dropdown">
+            <div class="avatar-circle" style="width: 24px; height: 24px; font-size: 0.7rem; background-color: {{ u.avatar_color if u else '#6161FF' }};">
+              {{ u.nombre[:1] | upper if u else 'U' }}
+            </div>
+            <span class="small fw-semibold text-dark">{{ u.nombre.split(' ')[0] if u else 'Invitado' }}</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="min-width: 200px;">
+            <li class="px-3 py-2 border-bottom">
+              <div class="fw-bold text-dark small">{{ u.nombre if u else 'Usuario' }}</div>
+              <div class="text-muted" style="font-size: 0.72rem;">{{ u.email if u else 'admin@proyectos.local' }}</div>
+              <span class="badge mt-1" style="background-color: {{ u.rol_color if u else '#6161FF' }}; font-size: 0.65rem;">
+                {{ u.rol if u else 'Administrador' }}
+              </span>
+            </li>
+            <li>
+              <a class="dropdown-item small py-2" href="/usuarios">
+                <i class="fa fa-user-gear me-2 text-muted"></i> Mi Cuenta / Perfiles
+              </a>
+            </li>
+            <li><hr class="dropdown-divider my-1"></li>
+            <li>
+              <a class="dropdown-item small text-danger py-2" href="/auth/logout">
+                <i class="fa fa-right-from-bracket me-2"></i> Cerrar Sesión
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </header>
+
+    <!-- CONTENIDO DINÁMICO DE LA VISTA -->
+    <div class="app-body">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <!-- MODAL DETALLE DE TAREA (SUBTAREAS & COMENTARIOS) -->
+  <div class="modal fade" id="modalDetalleTarea" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header modal-monday-header">
+          <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+            <i class="fa fa-circle-check text-success"></i>
+            Detalle de Actividad
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body p-4">
+          <input type="hidden" id="modalTareaId">
+
+          <!-- Título y Descripción -->
+          <div class="mb-3">
+            <label class="form-label fw-bold small text-muted">Título</label>
+            <input type="text" id="modalTareaTitulo" class="form-control form-control-lg fw-semibold" placeholder="Título de la tarea">
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-5">
+              <label class="form-label fw-bold small text-muted">Responsable</label>
+              <input type="text" id="modalTareaResponsable" class="form-control" placeholder="Ej. Daniel F.">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold small text-muted">Puntos de Historia</label>
+              <input type="number" id="modalTareaPuntos" class="form-control" min="1" max="100">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold small text-muted">Tipo</label>
+              <select id="modalTareaTipo" class="form-select">
+                <option value="Historia">Historia</option>
+                <option value="Tarea">Tarea</option>
+                <option value="Bug">Bug</option>
+                <option value="Mejora">Mejora</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold small text-muted">Fecha Inicio</label>
+              <input type="date" id="modalTareaFechaInicio" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold small text-muted">Fecha Límite</label>
+              <input type="date" id="modalTareaFechaLimite" class="form-control">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold small text-muted">Descripción / Criterios de Aceptación</label>
+            <textarea id="modalTareaDesc" class="form-control" rows="3" placeholder="Detalles de la actividad..."></textarea>
+          </div>
+
+          <div class="d-flex justify-content-end mb-4">
+            <button class="btn btn-sm btn-primary fw-semibold" onclick="guardarCambiosDetalle()">
+              <i class="fa fa-save me-1"></i> Guardar Cambios
+            </button>
+          </div>
+
+          <!-- TABS: SUBTAREAS & COMENTARIOS -->
+          <ul class="nav nav-tabs mb-3" id="taskTab" role="tablist">
+            <li class="nav-item">
+              <button class="nav-link active fw-semibold" id="subtasks-tab" data-bs-toggle="tab" data-bs-target="#tab-subtasks" type="button">
+                <i class="fa fa-list-check me-1"></i> Sub-elementos / Checklist
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link fw-semibold" id="comments-tab" data-bs-toggle="tab" data-bs-target="#tab-comments" type="button">
+                <i class="fa fa-comments me-1"></i> Actualizaciones & Feed
+              </button>
+            </li>
+          </ul>
+
+          <div class="tab-content" id="taskTabContent">
+            <!-- TAB SUBTAREAS -->
+            <div class="tab-pane fade show active" id="tab-subtasks">
+              <div class="input-group input-group-sm mb-3">
+                <input type="text" id="inputNuevaSubtarea" class="form-control" placeholder="Agregar nuevo elemento al checklist...">
+                <button class="btn btn-outline-primary fw-semibold" type="button" onclick="agregarSubtareaModal()">
+                  <i class="fa fa-plus"></i> Agregar
+                </button>
+              </div>
+              <div id="listaSubtareas" style="max-height: 200px; overflow-y: auto;"></div>
+            </div>
+
+            <!-- TAB COMENTARIOS -->
+            <div class="tab-pane fade" id="tab-comments">
+              <div class="row g-2 mb-3">
+                <div class="col-4">
+                  <input type="text" id="inputAutorComentario" class="form-control form-control-sm" placeholder="Tu nombre">
+                </div>
+                <div class="col-8">
+                  <div class="input-group input-group-sm">
+                    <input type="text" id="inputTextoComentario" class="form-control" placeholder="Escribe un comentario o actualización...">
+                    <button class="btn btn-primary" type="button" onclick="agregarComentarioModal()">
+                      <i class="fa fa-paper-plane"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div id="listaComentarios" style="max-height: 200px; overflow-y: auto;"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- App JS -->
+  <script src="/static/js/app.js"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>
+

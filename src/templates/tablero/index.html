@@ -1,0 +1,493 @@
+{% extends "base.html" %}
+
+{% block title %}Tablero - {{ proyecto_actual.nombre if proyecto_actual else 'Asistente de Proyectos' }}{% endblock %}
+
+{% block content %}
+<div class="monday-board-container">
+
+  <!-- RESUMEN SUPERIOR KPI -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm p-3 bg-white rounded-3">
+        <div class="text-muted small fw-semibold">Total Actividades</div>
+        <div class="h3 fw-bold mb-0 text-dark">{{ stats.total }}</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm p-3 bg-white rounded-3 border-start border-4" style="border-color: #00C875 !important;">
+        <div class="text-muted small fw-semibold">Completadas</div>
+        <div class="h3 fw-bold mb-0" style="color: #00C875;">{{ stats.completadas }}</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm p-3 bg-white rounded-3 border-start border-4" style="border-color: #FDAB3D !important;">
+        <div class="text-muted small fw-semibold">En Curso</div>
+        <div class="h3 fw-bold mb-0" style="color: #FDAB3D;">{{ stats.en_curso }}</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm p-3 bg-white rounded-3 border-start border-4" style="border-color: #E2445C !important;">
+        <div class="text-muted small fw-semibold">Bloqueadas</div>
+        <div class="h3 fw-bold mb-0" style="color: #E2445C;">{{ stats.bloqueadas }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GRUPOS ESTILO MONDAY -->
+  {% if grupos %}
+    {% for grupo in grupos %}
+    <div class="board-group" id="grupo-{{ grupo.id }}" data-grupo-id="{{ grupo.id }}">
+      <!-- Cabecera del Grupo con Edición de Nombre -->
+      <div class="board-group-header" style="border-left: 6px solid {{ grupo.color }};">
+        <div class="group-title-badge d-flex align-items-center gap-2">
+          <span class="group-color-bullet" style="background-color: {{ grupo.color }};"></span>
+          <span
+            class="text-dark fw-bold group-title-text"
+            id="group-title-{{ grupo.id }}"
+            onclick="editarNombreGrupo({{ grupo.id }}, '{{ grupo.titulo }}')"
+            title="Clic para renombrar este grupo"
+            style="cursor: pointer;"
+          >
+            {{ grupo.titulo }}
+          </span>
+          <button
+            class="btn btn-sm btn-link text-muted p-0"
+            onclick="editarNombreGrupo({{ grupo.id }}, '{{ grupo.titulo }}')"
+            title="Cambiar nombre del grupo"
+          >
+            <i class="fa fa-pen" style="font-size: 0.75rem;"></i>
+          </button>
+          <span class="badge rounded-pill bg-light text-secondary border ms-2" id="group-count-{{ grupo.id }}">
+            {{ grupo.tareas|length }} elementos
+          </span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-sm btn-link text-danger p-0 border-0" onclick="eliminarGrupo({{ grupo.id }})" title="Eliminar grupo">
+            <i class="fa fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabla de Tareas Monday -->
+      <div class="table-responsive">
+        <table class="monday-table">
+          <thead>
+            <tr>
+              <th style="min-width: 290px;">Elemento</th>
+              <th style="width: 150px;">Responsable</th>
+              <th style="width: 140px;">Estado</th>
+              <th style="width: 110px;">Prioridad</th>
+              <th style="width: 80px;">Puntos</th>
+              <th style="width: 165px;">Fecha Límite</th>
+              <th style="width: 110px;">Sub-elementos</th>
+              <th style="width: 50px;"></th>
+            </tr>
+          </thead>
+          <tbody class="monday-tbody" data-grupo-id="{{ grupo.id }}">
+            {% for t in grupo.tareas %}
+            <!-- Fila Principal de Tarea -->
+            <tr class="tarea-fila" draggable="true" data-tarea-id="{{ t.id }}" data-grupo-id="{{ grupo.id }}" id="fila-tarea-{{ t.id }}">
+              <!-- Nombre / Elemento con Chevron de Subelementos y Drag Handle -->
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="drag-handle" title="Arrastrar para mover fila">
+                    <i class="fa fa-grip-vertical text-muted opacity-50" style="cursor: grab;"></i>
+                  </span>
+
+                  <!-- Botón expandir/colapsar subelementos estilo Monday -->
+                  <button
+                    class="btn btn-sm btn-link p-0 text-muted subelements-btn"
+                    onclick="toggleSubelementos({{ t.id }})"
+                    title="Mostrar / ocultar sub-elementos"
+                    style="line-height: 1; text-decoration: none;"
+                  >
+                    <i class="fa fa-chevron-right" id="chevron-sub-{{ t.id }}" style="font-size: 0.75rem; transition: transform 0.2s;"></i>
+                  </button>
+
+                  <a href="javascript:void(0)" class="fw-semibold text-decoration-none text-dark hover-primary" onclick="verDetalleTarea({{ t.id }})">
+                    {{ t.titulo }}
+                  </a>
+                  {% if t.tipo_tarea == 'Bug' %}
+                    <span class="badge bg-danger-subtle text-danger" style="font-size:0.65rem;">BUG</span>
+                  {% elif t.tipo_tarea == 'Historia' %}
+                    <span class="badge bg-primary-subtle text-primary" style="font-size:0.65rem;">HISTORIA</span>
+                  {% endif %}
+                </div>
+              </td>
+
+              <!-- Responsable -->
+              <td>
+                <div class="user-avatar-pill">
+                  <div class="avatar-circle">
+                    {{ t.responsable[:1] | upper if t.responsable else '?' }}
+                  </div>
+                  <span class="text-truncate" style="max-width: 100px;">{{ t.responsable }}</span>
+                </div>
+              </td>
+
+              <!-- Estado Monday (Click to Change) -->
+              <td class="monday-status-cell" onclick="abrirSelectorEstado(event, {{ t.id }})">
+                <span class="status-badge status-{{ t.estado | replace(' ', '-') }}">
+                  {{ t.estado }}
+                </span>
+              </td>
+
+              <!-- Prioridad -->
+              <td onclick="abrirSelectorPrioridad(event, {{ t.id }})" style="cursor: pointer;">
+                <span class="prio-badge prio-{{ t.prioridad | replace('í', 'i') }}">
+                  {{ t.prioridad }}
+                </span>
+              </td>
+
+              <!-- Puntos de historia -->
+              <td>
+                <span class="badge bg-light text-dark border fw-bold">{{ t.puntos_historia }} pts</span>
+              </td>
+
+              <!-- Fechas interactivas estilo Monday -->
+              <td>
+                <div class="d-flex align-items-center justify-content-center gap-1 bg-white px-2 py-1 border rounded" style="max-width: 145px; margin: 0 auto;">
+                  <i class="fa fa-calendar-days text-muted small"></i>
+                  <input
+                    type="date"
+                    class="form-control form-control-sm border-0 bg-transparent text-center p-0"
+                    style="font-size: 0.82rem; cursor: pointer;"
+                    value="{{ t.fecha_limite.strftime('%Y-%m-%d') if t.fecha_limite else '' }}"
+                    onchange="actualizarFechaTarea({{ t.id }}, this.value)"
+                    title="Clic para cambiar fecha límite"
+                  >
+                </div>
+              </td>
+
+              <!-- Columna Sub-elementos interactiva -->
+              <td>
+                {% set done = t.subtareas | selectattr('completada', 'equalto', True) | list | length %}
+                <button
+                  class="btn btn-sm btn-light border py-0 px-2 d-inline-flex align-items-center gap-1"
+                  onclick="toggleSubelementos({{ t.id }})"
+                  title="Ver sub-elementos"
+                  id="badge-sub-{{ t.id }}"
+                  style="font-size: 0.78rem;"
+                >
+                  <i class="fa fa-list-check {% if done == t.subtareas|length and t.subtareas|length > 0 %}text-success{% else %}text-primary{% endif %}"></i>
+                  <span>{{ done }}/{{ t.subtareas|length }}</span>
+                </button>
+              </td>
+
+              <!-- Acciones -->
+              <td>
+                <button class="btn btn-sm btn-link text-danger p-0" onclick="confirmarEliminarTarea({{ t.id }}, event)">
+                  <i class="fa fa-times"></i>
+                </button>
+              </td>
+            </tr>
+
+            <!-- Fila Expandible de Sub-elementos Directo en el Tablero -->
+            <tr class="subelementos-contenedor-row d-none" id="subrow-{{ t.id }}">
+              <td colspan="8" class="p-0 bg-light">
+                <div class="p-3 ps-5 border-start border-4 ms-4 my-2 bg-white rounded-2 shadow-sm" style="border-color: #6161FF !important;">
+                  <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
+                    <div class="small fw-bold text-muted text-uppercase d-flex align-items-center gap-2" style="font-size:0.75rem;">
+                      <i class="fa fa-list-check text-primary"></i> Sub-elementos de: <span class="text-dark fw-bold">{{ t.titulo }}</span>
+                    </div>
+                    <span class="badge bg-light text-dark border small" id="sub-counter-badge-{{ t.id }}">
+                      {{ done }} de {{ t.subtareas|length }} completados
+                    </span>
+                  </div>
+
+                  <!-- Lista de Subelementos -->
+                  <div id="subitems-list-{{ t.id }}" class="d-flex flex-column gap-1 mb-2">
+                    {% for sub in t.subtareas %}
+                    <div class="d-flex align-items-center justify-content-between py-1 px-2 rounded bg-light" id="subitem-row-{{ sub.id }}">
+                      <div class="form-check mb-0 d-flex align-items-center gap-2">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          id="chk-sub-{{ sub.id }}"
+                          {% if sub.completada %}checked{% endif %}
+                          onchange="toggleSubitemInline({{ sub.id }}, {{ t.id }})"
+                        >
+                        <label
+                          class="form-check-label small {% if sub.completada %}text-decoration-line-through text-muted{% else %}text-dark fw-medium{% endif %}"
+                          for="chk-sub-{{ sub.id }}"
+                          id="label-sub-{{ sub.id }}"
+                        >
+                          {{ sub.titulo }}
+                        </label>
+                      </div>
+                      <button
+                        class="btn btn-sm btn-link text-danger p-0"
+                        onclick="eliminarSubitemInline({{ sub.id }}, {{ t.id }})"
+                        title="Eliminar este sub-elemento"
+                      >
+                        <i class="fa fa-trash-can small"></i>
+                      </button>
+                    </div>
+                    {% else %}
+                    <div class="text-muted small py-1 fst-italic" id="sub-empty-msg-{{ t.id }}">
+                      No hay sub-elementos aún. Agrega el primero a continuación.
+                    </div>
+                    {% endfor %}
+                  </div>
+
+                  <!-- Fila Agregar Subelemento Inline -->
+                  <div class="d-flex align-items-center gap-2 pt-2 border-top">
+                    <i class="fa fa-plus text-primary small"></i>
+                    <input
+                      type="text"
+                      id="input-subitem-{{ t.id }}"
+                      class="form-control form-control-sm"
+                      placeholder="+ Agregar nuevo sub-elemento..."
+                      onkeydown="if(event.key === 'Enter') agregarSubitemInline({{ t.id }})"
+                      style="max-width: 420px;"
+                    >
+                    <button class="btn btn-sm btn-outline-primary py-1 px-3 fw-semibold" onclick="agregarSubitemInline({{ t.id }})">
+                      Agregar
+                    </button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Fila Agregar Elemento con Fecha estilo Monday -->
+      <div class="add-task-row">
+        <i class="fa fa-plus text-primary"></i>
+        <input
+          type="text"
+          id="input-task-{{ grupo.id }}"
+          class="add-task-input"
+          placeholder="+ Agregar nueva actividad a este grupo..."
+          onkeydown="if(event.key === 'Enter') crearTareaConFecha({{ grupo.id }})"
+        >
+        <div class="d-flex align-items-center gap-1 bg-white px-2 py-1 border rounded" style="width: 150px;">
+          <i class="fa fa-calendar-days text-muted small"></i>
+          <input
+            type="date"
+            id="date-task-{{ grupo.id }}"
+            class="form-control form-control-sm border-0 p-0"
+            style="font-size:0.82rem;"
+            title="Asignar fecha límite"
+          >
+        </div>
+        <button class="btn btn-sm btn-primary fw-semibold px-3" onclick="crearTareaConFecha({{ grupo.id }})">
+          Agregar
+        </button>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="text-center py-5 bg-white rounded-3 shadow-sm border">
+      <i class="fa fa-clipboard-list text-muted fa-3x mb-3"></i>
+      <h5 class="fw-bold">No hay grupos en este proyecto</h5>
+      <p class="text-muted small mb-3">Crea un grupo para comenzar a organizar tus actividades y tareas.</p>
+      {% if proyecto_actual %}
+      <button class="btn btn-primary" onclick="crearNuevoGrupo({{ proyecto_actual.id }})">
+        <i class="fa fa-plus me-1"></i> Crear Primer Grupo
+      </button>
+      {% endif %}
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  initTableDragDrop();
+});
+
+// ==========================================
+// RENOMBRAR GRUPOS DINÁMICAMENTE
+// ==========================================
+async function editarNombreGrupo(grupoId, tituloActual) {
+  const { value: nuevoTitulo } = await Swal.fire({
+    title: 'Renombrar Grupo',
+    input: 'text',
+    inputValue: tituloActual,
+    inputLabel: 'Nombre del grupo',
+    inputPlaceholder: 'Escribe el nuevo nombre del grupo...',
+    showCancelButton: true,
+    confirmButtonText: 'Guardar',
+    confirmButtonColor: '#6161FF',
+    cancelButtonText: 'Cancelar',
+    inputValidator: (val) => {
+      if (!val || val.trim() === '') {
+        return 'El nombre del grupo no puede estar vacío';
+      }
+    }
+  });
+
+  if (nuevoTitulo && nuevoTitulo.trim() !== '') {
+    try {
+      const res = await fetch(`/api/grupos/${grupoId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ titulo: nuevoTitulo.trim() }),
+      });
+      if (res.ok) {
+        Toast.fire({ icon: 'success', title: 'Grupo renombrado con éxito' });
+        const el = document.getElementById(`group-title-${grupoId}`);
+        if (el) el.textContent = nuevoTitulo.trim();
+      } else {
+        Toast.fire({ icon: 'error', title: 'Error al renombrar grupo' });
+      }
+    } catch (e) {
+      console.error(e);
+      Toast.fire({ icon: 'error', title: 'Error de red' });
+    }
+  }
+}
+
+// ==========================================
+// SUB-ELEMENTOS EN TABLERO MONDAY
+// ==========================================
+
+function toggleSubelementos(tareaId) {
+  const subrow = document.getElementById(`subrow-${tareaId}`);
+  const chevron = document.getElementById(`chevron-sub-${tareaId}`);
+  if (!subrow) return;
+
+  if (subrow.classList.contains('d-none')) {
+    subrow.classList.remove('d-none');
+    if (chevron) chevron.style.transform = 'rotate(90deg)';
+  } else {
+    subrow.classList.add('d-none');
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+  }
+}
+
+async function toggleSubitemInline(subId, tareaId) {
+  try {
+    const res = await fetch(`/api/subtareas/${subId}/toggle`, { method: 'PATCH' });
+    if (res.ok) {
+      const data = await res.json();
+      const label = document.getElementById(`label-sub-${subId}`);
+      if (label) {
+        if (data.completada) {
+          label.classList.add('text-decoration-line-through', 'text-muted');
+          label.classList.remove('text-dark', 'fw-medium');
+        } else {
+          label.classList.remove('text-decoration-line-through', 'text-muted');
+          label.classList.add('text-dark', 'fw-medium');
+        }
+      }
+      actualizarContadorSubelementos(tareaId);
+      Toast.fire({ icon: 'success', title: 'Sub-elemento actualizado' });
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function agregarSubitemInline(tareaId) {
+  const input = document.getElementById(`input-subitem-${tareaId}`);
+  const titulo = input.value.trim();
+  if (!titulo) return;
+
+  try {
+    const res = await fetch(`/api/tareas/${tareaId}/subtareas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ titulo: titulo }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      input.value = '';
+
+      // Remover mensaje vacío si existiera
+      const emptyMsg = document.getElementById(`sub-empty-msg-${tareaId}`);
+      if (emptyMsg) emptyMsg.remove();
+
+      // Insertar nuevo subitem en la lista
+      const list = document.getElementById(`subitems-list-${tareaId}`);
+      const newDiv = document.createElement('div');
+      newDiv.className = 'd-flex align-items-center justify-content-between py-1 px-2 rounded bg-light';
+      newDiv.id = `subitem-row-${data.id}`;
+      newDiv.innerHTML = `
+        <div class="form-check mb-0 d-flex align-items-center gap-2">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            id="chk-sub-${data.id}"
+            onchange="toggleSubitemInline(${data.id}, ${tareaId})"
+          >
+          <label class="form-check-label small text-dark fw-medium" for="chk-sub-${data.id}" id="label-sub-${data.id}">
+            ${data.titulo}
+          </label>
+        </div>
+        <button class="btn btn-sm btn-link text-danger p-0" onclick="eliminarSubitemInline(${data.id}, ${tareaId})" title="Eliminar este sub-elemento">
+          <i class="fa fa-trash-can small"></i>
+        </button>
+      `;
+      list.appendChild(newDiv);
+      actualizarContadorSubelementos(tareaId);
+      Toast.fire({ icon: 'success', title: 'Sub-elemento agregado' });
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function eliminarSubitemInline(subId, tareaId) {
+  try {
+    const res = await fetch(`/api/subtareas/${subId}`, { method: 'DELETE' });
+    if (res.ok) {
+      const row = document.getElementById(`subitem-row-${subId}`);
+      if (row) row.remove();
+      actualizarContadorSubelementos(tareaId);
+      Toast.fire({ icon: 'success', title: 'Sub-elemento eliminado' });
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function actualizarContadorSubelementos(tareaId) {
+  const container = document.getElementById(`subitems-list-${tareaId}`);
+  if (!container) return;
+  const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+  const total = checkboxes.length;
+  let completados = 0;
+  checkboxes.forEach(cb => { if (cb.checked) completados++; });
+
+  const badgeBtn = document.getElementById(`badge-sub-${tareaId}`);
+  if (badgeBtn) {
+    badgeBtn.innerHTML = `
+      <i class="fa fa-list-check ${completados === total && total > 0 ? 'text-success' : 'text-primary'}"></i>
+      <span>${completados}/${total}</span>
+    `;
+  }
+
+  const badgeHeader = document.getElementById(`sub-counter-badge-${tareaId}`);
+  if (badgeHeader) {
+    badgeHeader.textContent = `${completados} de ${total} completados`;
+  }
+}
+
+async function eliminarGrupo(grupoId) {
+  const result = await Swal.fire({
+    title: '¿Eliminar este grupo?',
+    text: 'Se eliminarán todas las tareas pertenecientes a este grupo.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#e2445c',
+    confirmButtonText: 'Sí, eliminar',
+    cancelButtonText: 'Cancelar',
+  });
+
+  if (result.isConfirmed) {
+    const res = await fetch(`/api/grupos/${grupoId}`, { method: 'DELETE' });
+    if (res.ok) {
+      Toast.fire({ icon: 'success', title: 'Grupo eliminado' });
+      setTimeout(() => location.reload(), 400);
+    }
+  }
+}
+</script>
+{% endblock %}

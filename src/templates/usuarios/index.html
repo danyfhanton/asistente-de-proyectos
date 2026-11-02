@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+
+{% block title %}Administración de Usuarios - {{ proyecto_actual.nombre if proyecto_actual else 'Asistente de Proyectos' }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="fw-bold mb-1">Directorio de Usuarios</h3>
+      <p class="text-muted small mb-0">Gestiona los colaboradores, credenciales de acceso, asignación de roles y alcance de proyectos en SQL Server.</p>
+    </div>
+    <button class="btn btn-primary fw-semibold" onclick="abrirModalCrearUsuario()">
+      <i class="fa fa-user-plus me-1"></i> Nuevo Usuario
+    </button>
+  </div>
+
+  <!-- TABLA DE USUARIOS -->
+  <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="bg-light">
+          <tr>
+            <th class="ps-4 text-muted small fw-semibold text-uppercase">Colaborador</th>
+            <th class="text-muted small fw-semibold text-uppercase">Correo Electrónico</th>
+            <th class="text-muted small fw-semibold text-uppercase">Rol Asignado</th>
+            <th class="text-muted small fw-semibold text-uppercase">Proyecto Asignado</th>
+            <th class="text-muted small fw-semibold text-uppercase">Cargo</th>
+            <th class="text-center text-muted small fw-semibold text-uppercase">Estado</th>
+            <th class="text-muted small fw-semibold text-uppercase">Último Acceso</th>
+            <th class="text-end pe-4 text-muted small fw-semibold text-uppercase">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in usuarios %}
+          <tr>
+            <!-- Colaborador / Avatar -->
+            <td class="ps-4">
+              <div class="d-flex align-items-center gap-3">
+                <div class="avatar-circle" style="width: 38px; height: 38px; font-size: 0.95rem; background-color: {{ u.avatar_color }};">
+                  {{ u.nombre[:1] | upper }}
+                </div>
+                <div>
+                  <div class="fw-bold text-dark">{{ u.nombre }}</div>
+                  <div class="text-muted small" style="font-size: 0.75rem;">ID #{{ u.id }}</div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Correo -->
+            <td>
+              <span class="text-secondary small">{{ u.email }}</span>
+            </td>
+
+            <!-- Rol -->
+            <td>
+              {% if u.rol %}
+              <div class="d-flex flex-column gap-1">
+                <span class="badge" style="background-color: {{ u.rol.color }}; color: white; font-weight: 600; padding: 0.35rem 0.65rem; width: fit-content;">
+                  {{ u.rol.nombre }}
+                </span>
+                <span class="text-muted" style="font-size: 0.7rem;">
+                  {% if u.rol.alcance_proyectos == 'uno' %}
+                    <i class="fa fa-lock text-warning"></i> Restringido a 1 proyecto
+                  {% else %}
+                    <i class="fa fa-globe text-success"></i> Acceso a todos
+                  {% endif %}
+                </span>
+              </div>
+              {% else %}
+              <span class="badge bg-secondary">Sin Rol</span>
+              {% endif %}
+            </td>
+
+            <!-- Proyecto Asignado -->
+            <td>
+              {% if u.rol and u.rol.alcance_proyectos == 'uno' %}
+                {% if u.proyecto_asignado %}
+                  <span class="badge bg-light text-dark border">
+                    <i class="fa fa-folder-closed text-warning me-1"></i> {{ u.proyecto_asignado.nombre }}
+                  </span>
+                {% else %}
+                  <span class="badge bg-warning text-dark">
+                    <i class="fa fa-triangle-exclamation me-1"></i> Sin proyecto asignado
+                  </span>
+                {% endif %}
+              {% else %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle">
+                  <i class="fa fa-globe me-1"></i> Todos los proyectos
+                </span>
+              {% endif %}
+            </td>
+
+            <!-- Cargo -->
+            <td>
+              <span class="text-muted small">{{ u.cargo }}</span>
+            </td>
+
+            <!-- Estado Activo / Inactivo -->
+            <td class="text-center">
+              <div class="form-check form-switch d-inline-block">
+                <input class="form-check-input" type="checkbox" role="switch" {% if u.activo %}checked{% endif %} onchange="toggleActivoUsuario({{ u.id }})">
+              </div>
+              <span class="small d-block text-muted" style="font-size: 0.7rem;">
+                {{ 'Activo' if u.activo else 'Inactivo' }}
+              </span>
+            </td>
+
+            <!-- Último Acceso -->
+            <td>
+              <span class="text-muted small">
+                {% if u.ultimo_acceso %}
+                  {{ u.ultimo_acceso.strftime('%d/%m/%Y %H:%M') }}
+                {% else %}
+                  <span class="text-black-50">Nunca</span>
+                {% endif %}
+              </span>
+            </td>
+
+            <!-- Acciones -->
+            <td class="text-end pe-4">
+              <button class="btn btn-sm btn-link text-primary p-0 me-2" onclick="abrirModalEditarUsuario({{ u.id }}, '{{ u.nombre }}', '{{ u.email }}', {{ u.rol_id or 'null' }}, {{ u.proyecto_id or 'null' }}, '{{ u.cargo }}')" title="Editar">
+                <i class="fa fa-pen"></i>
+              </button>
+              <button class="btn btn-sm btn-link text-danger p-0" onclick="confirmarEliminarUsuario({{ u.id }})" title="Eliminar">
+                <i class="fa fa-trash"></i>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL CREAR USUARIO -->
+<div class="modal fade" id="modalCrearUsuario" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header modal-monday-header">
+        <h5 class="modal-title fw-bold">Nuevo Usuario</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-muted">Nombre Completo</label>
+          <input type="text" id="crear-user-nombre" class="form-control" placeholder="Ej. Ana Morales">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-muted">Correo Electrónico</label>
+          <input type="email" id="crear-user-email" class="form-control" placeholder="ana@proyectos.local">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-muted">Contraseña</label>
+          <input type="password" id="crear-user-pw" class="form-control" placeholder="••••••••">
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label small fw-bold text-muted">Rol Asignado</label>
+            <select id="crear-user-rol" class="form-select">
+              <option value="">Seleccionar rol...</option>
+              {% for r in roles %}
+              <option value="{{ r.id }}">{{ r.nombre }} ({% if r.alcance_proyectos == 'uno' %}1 Proyecto{% else %}Todos{% endif %})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-bold text-muted">Cargo / Puesto</label>
+            <input type="text" id="crear-user-cargo" class="form-control" placeholder="Ej. Desarrollador">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-muted">
+            Proyecto Asignado <span class="fw-normal text-muted">(Si su rol solo permite 1 proyecto)</span>
+          </label>
+          <select id="crear-user-proyecto" class="form-select">
+            <option value="">Ninguno / No asignado</option>
+            {% for p in todos_los_proyectos %}
+            <option value="{{ p.id }}">{{ p.nombre }} ({{ p.clave }})</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-sm fw-semibold" onclick="guardarNuevoUsuario()">Guardar Usuario</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR USUARIO -->
+<div class="modal fade" id="modalEditarUsuario" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header modal-monday-header">
+        <h5 class="modal-title fw-bold">Editar Usuario</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <input type="hidden" id="edit-user-id">
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-muted">Nombre Completo</label>
+          <input type="text" id="edit-user-nombre" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-muted">Correo Electrónico</label>
+          <input type="email" id="edit-user-email" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-muted">Nueva Contraseña (dejar en blanco para conservar actual)</label>
+          <input type="password" id="edit-user-pw" class="form-control" placeholder="Nueva contraseña opcional">
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label small fw-bold text-muted">Rol Asignado</label>
+            <select id="edit-user-rol" class="form-select">
+              <option value="">Seleccionar rol...</option>
+              {% for r in roles %}
+              <option value="{{ r.id }}">{{ r.nombre }} ({% if r.alcance_proyectos == 'uno' %}1 Proyecto{% else %}Todos{% endif %})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-bold text-muted">Cargo / Puesto</label>
+            <input type="text" id="edit-user-cargo" class="form-control">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-muted">
+            Proyecto Asignado <span class="fw-normal text-muted">(Si su rol solo permite 1 proyecto)</span>
+          </label>
+          <select id="edit-user-proyecto" class="form-select">
+            <option value="">Ninguno / No asignado</option>
+            {% for p in todos_los_proyectos %}
+            <option value="{{ p.id }}">{{ p.nombre }} ({{ p.clave }})</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-sm fw-semibold" onclick="guardarEdicionUsuario()">Actualizar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function abrirModalCrearUsuario() {
+  new bootstrap.Modal(document.getElementById('modalCrearUsuario')).show();
+}
+
+async function guardarNuevoUsuario() {
+  const nombre = document.getElementById('crear-user-nombre').value.trim();
+  const email = document.getElementById('crear-user-email').value.trim();
+  const password = document.getElementById('crear-user-pw').value;
+  const rolId = document.getElementById('crear-user-rol').value;
+  const proyectoId = document.getElementById('crear-user-proyecto').value;
+  const cargo = document.getElementById('crear-user-cargo').value.trim();
+
+  if (!nombre || !email || !password) {
+    Swal.fire({ icon: 'warning', title: 'Campos requeridos', text: 'Nombre, correo y contraseña son obligatorios' });
+    return;
+  }
+
+  const res = await fetch('/api/usuarios', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nombre: nombre,
+      email: email,
+      password: password,
+      rol_id: rolId ? parseInt(rolId) : null,
+      proyecto_id: proyectoId ? parseInt(proyectoId) : null,
+      cargo: cargo,
+    })
+  });
+
+  if (res.ok) {
+    Toast.fire({ icon: 'success', title: 'Usuario creado con éxito' });
+    setTimeout(() => location.reload(), 400);
+  } else {
+    const err = await res.json();
+    Swal.fire({ icon: 'error', title: 'Error', text: err.detail || 'No se pudo crear el usuario' });
+  }
+}
+
+function abrirModalEditarUsuario(id, nombre, email, rolId, proyectoId, cargo) {
+  document.getElementById('edit-user-id').value = id;
+  document.getElementById('edit-user-nombre').value = nombre;
+  document.getElementById('edit-user-email').value = email;
+  document.getElementById('edit-user-pw').value = '';
+  document.getElementById('edit-user-rol').value = rolId || '';
+  document.getElementById('edit-user-proyecto').value = proyectoId || '';
+  document.getElementById('edit-user-cargo').value = cargo || '';
+  new bootstrap.Modal(document.getElementById('modalEditarUsuario')).show();
+}
+
+async function guardarEdicionUsuario() {
+  const id = document.getElementById('edit-user-id').value;
+  const rolVal = document.getElementById('edit-user-rol').value;
+  const proyVal = document.getElementById('edit-user-proyecto').value;
+
+  const payload = {
+    nombre: document.getElementById('edit-user-nombre').value.trim(),
+    email: document.getElementById('edit-user-email').value.trim(),
+    cargo: document.getElementById('edit-user-cargo').value.trim(),
+    rol_id: rolVal ? parseInt(rolVal) : null,
+    proyecto_id: proyVal ? parseInt(proyVal) : null,
+  };
+  const pw = document.getElementById('edit-user-pw').value;
+  if (pw) {
+    payload.password = pw;
+  }
+
+  const res = await fetch(`/api/usuarios/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (res.ok) {
+    Toast.fire({ icon: 'success', title: 'Usuario actualizado' });
+    setTimeout(() => location.reload(), 400);
+  }
+}
+
+async function toggleActivoUsuario(id) {
+  const res = await fetch(`/api/usuarios/${id}/toggle-activo`, { method: 'PATCH' });
+  if (res.ok) {
+    Toast.fire({ icon: 'success', title: 'Estado de usuario actualizado' });
+  }
+}
+
+async function confirmarEliminarUsuario(id) {
+  const result = await Swal.fire({
+    title: '¿Eliminar usuario?',
+    text: 'Esta acción removerá las credenciales y acceso del colaborador.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#e2445c',
+    confirmButtonText: 'Sí, eliminar',
+    cancelButtonText: 'Cancelar'
+  });
+
+  if (result.isConfirmed) {
+    const res = await fetch(`/api/usuarios/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      Toast.fire({ icon: 'success', title: 'Usuario eliminado' });
+      setTimeout(() => location.reload(), 400);
+    }
+  }
+}
+</script>
+{% endblock %}

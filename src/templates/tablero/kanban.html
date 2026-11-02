@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Tablero Kanban - {{ proyecto_actual.nombre if proyecto_actual else 'Asistente de Proyectos' }}{% endblock %}
+
+{% block content %}
+<div class="kanban-board-container">
+
+  {% set col_config = [
+    {'nombre': 'Por iniciar', 'color': '#C4C4C4', 'icon': 'fa-circle-dot'},
+    {'nombre': 'En curso', 'color': '#FDAB3D', 'icon': 'fa-spinner'},
+    {'nombre': 'En espera', 'color': '#579BFC', 'icon': 'fa-pause'},
+    {'nombre': 'Bloqueado', 'color': '#E2445C', 'icon': 'fa-circle-exclamation'},
+    {'nombre': 'Listo', 'color': '#00C875', 'icon': 'fa-circle-check'}
+  ] %}
+
+  {% for col in col_config %}
+  <div class="kanban-column">
+    <!-- Header de Columna -->
+    <div class="kanban-col-header" style="border-top: 4px solid {{ col.color }};">
+      <div class="d-flex align-items-center gap-2">
+        <i class="fa {{ col.icon }}" style="color: {{ col.color }};"></i>
+        <span>{{ col.nombre }}</span>
+      </div>
+      <span class="badge rounded-pill bg-white text-dark border">
+        {{ columnas[col.nombre]|length }}
+      </span>
+    </div>
+
+    <!-- Contenedor Drag & Drop -->
+    <div class="kanban-cards-container" data-estado="{{ col.nombre }}">
+      {% for t in columnas[col.nombre] %}
+      <div class="kanban-card" draggable="true" data-tarea-id="{{ t.id }}" onclick="verDetalleTarea({{ t.id }})">
+        <!-- Tipo y Prioridad -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="badge bg-light text-secondary border small">{{ t.tipo_tarea }}</span>
+          <span class="prio-badge prio-{{ t.prioridad | replace('í', 'i') }}" style="font-size: 0.7rem; padding: 0.15rem 0.5rem;">
+            {{ t.prioridad }}
+          </span>
+        </div>
+
+        <!-- Título -->
+        <div class="fw-semibold text-dark mb-2" style="font-size: 0.92rem; line-height: 1.3;">
+          {{ t.titulo }}
+        </div>
+
+        <!-- Footer Tarjeta: Responsable & Puntos -->
+        <div class="d-flex justify-content-between align-items-center pt-2 border-top border-light mt-2">
+          <div class="user-avatar-pill py-0 px-2">
+            <div class="avatar-circle" style="width: 18px; height: 18px; font-size: 0.6rem;">
+              {{ t.responsable[:1] | upper if t.responsable else '?' }}
+            </div>
+            <span class="small text-truncate" style="max-width: 90px;">{{ t.responsable }}</span>
+          </div>
+
+          <div class="d-flex align-items-center gap-2">
+            {% if t.subtareas %}
+            <span class="text-muted small">
+              <i class="fa fa-list-check me-1"></i>
+              {{ t.subtareas | selectattr('completada', 'equalto', True) | list | length }}/{{ t.subtareas|length }}
+            </span>
+            {% endif %}
+            <span class="badge bg-light text-dark border fw-bold">{{ t.puntos_historia }} pts</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  initKanbanDragDrop();
+});
+</script>
+{% endblock %}
+
